@@ -6,6 +6,7 @@ out/
 __pycache__/
 *.pyc
 .venv/
+.ipynb_checkpoints/
 *.o
 *.obj
 *.exe

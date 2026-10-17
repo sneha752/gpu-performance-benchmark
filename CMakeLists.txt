@@ -18,13 +18,16 @@ if(ENABLE_CUDA)
   check_language(CUDA)
   if(CMAKE_CUDA_COMPILER)
     if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-      # "native" targets the GPU in this machine but needs one at configure
-      # time; otherwise build for common recent architectures (T4, A100, RTX 30/40).
+      # "native" (CMake >= 3.24) targets exactly the GPU in this machine, so it is
+      # always correct when a device is present at configure time. Otherwise fall
+      # back to an explicit list covering the GPUs the free cloud runtimes hand out:
+      # P100 (60), V100 (70), T4 (75), A100 (80), RTX 30 (86), L4/RTX 40 (89).
+      # Architecture 89 needs CUDA >= 11.8; Colab and Kaggle both ship CUDA 12.x.
       find_program(NVIDIA_SMI nvidia-smi)
       if(NVIDIA_SMI AND CMAKE_VERSION VERSION_GREATER_EQUAL 3.24)
         set(CMAKE_CUDA_ARCHITECTURES native)
       else()
-        set(CMAKE_CUDA_ARCHITECTURES 75 80 86 89)
+        set(CMAKE_CUDA_ARCHITECTURES 60 70 75 80 86 89)
       endif()
     endif()
     enable_language(CUDA)

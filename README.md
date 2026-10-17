@@ -31,6 +31,8 @@ gpu-performance-benchmark/
 ├── scripts/
 │   ├── run_benchmarks.py     # correctness gate → benchmark → run_metadata.json
 │   └── plot_results.py       # pandas/matplotlib plots + plots/summary.md
+├── notebooks/
+│   └── gpu_benchmark_colab.ipynb  # one-click GPU run on Google Colab
 ├── results/                  # benchmark_results.csv, run_metadata.json
 └── plots/                    # *.png, summary.md
 ```
@@ -52,19 +54,38 @@ python3 scripts/run_benchmarks.py               # correctness gate + benchmark �
 python3 scripts/plot_results.py                 # plots/ + plots/summary.md
 ```
 
-### Free cloud GPU (Google Colab / Kaggle, NVIDIA T4)
+### Free cloud GPU (Google Colab, NVIDIA GPU) — recommended
 
-Colab images ship with nvcc, CMake, pandas and matplotlib. In a notebook with a GPU runtime:
+Real GPU numbers come from `notebooks/gpu_benchmark_colab.ipynb`. It builds the CUDA
+kernels for the exact GPU Colab assigns (P100, V100, T4, A100 or L4 are all covered),
+runs the correctness tests and benchmark, and packages the results for download.
 
-```bash
-!nvidia-smi
-!git clone <your-repo-url> && cd gpu-performance-benchmark && \
-  cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j && \
-  ctest --test-dir build --output-on-failure && \
-  python3 scripts/run_benchmarks.py && python3 scripts/plot_results.py
-```
+**Open it in Colab**, then set the runtime to GPU: *Runtime → Change runtime type →*
+*Hardware accelerator → GPU → Save.* Either
+- push this project to GitHub, open the notebook from there
+  (`https://colab.research.google.com/github/<you>/<repo>/blob/main/notebooks/gpu_benchmark_colab.ipynb`),
+  and set `REPO_URL` in cell 2 to your clone URL; or
+- upload `notebooks/gpu_benchmark_colab.ipynb` to Colab, leave `REPO_URL` empty, and
+  upload a zip of the project folder when cell 2 asks.
 
-Then download `results/` and `plots/` (or commit them from the notebook).
+**Run every cell top to bottom, in order:**
+
+| Cell | Does |
+|---|---|
+| 1 | Checks for an NVIDIA GPU; prints GPU name, driver, and `nvcc` version. Stops if no GPU. |
+| 2 | Clones your repo (`REPO_URL`) or unzips an uploaded project, and locates `CMakeLists.txt`. |
+| 3 | Installs a recent CMake (so the build targets *this* GPU) plus pandas/matplotlib if missing. |
+| 4 | Configures and builds with CUDA enabled; aborts if CUDA is not actually detected. |
+| 5 | Runs the CUDA correctness tests, including sizes that are **not** multiples of the tile (7, 15, 17, 31, 33, 100, 127, 129, 255, 257) and tile sizes 8/16/32. |
+| 6 | Runs the benchmark for CPU, naive CUDA and tiled CUDA → `results/benchmark_results.csv`. |
+| 7 | Generates `plots/*.png` and `plots/summary.md`. |
+| 8 | Shows the CSV, summary and plots inline. |
+| 9 | Zips `results/` and `plots/` and downloads the archive. |
+| 10 | Instructions for committing the results to your repo. |
+
+Each cell checks its exit code and raises on failure, so a failed build or test stops
+the notebook with the real error — no results are ever fabricated. Then unzip the
+downloaded archive into the project and commit `results/` and `plots/`.
 
 ### Native Windows (MSVC + CUDA)
 
@@ -175,8 +196,9 @@ Source: `results/benchmark_results.csv`, `results/run_metadata.json`, `plots/sum
 - N ≥ 1024 has a single timed run (by design, to keep the 2048 run near one minute), so those
   medians carry more noise than the small sizes.
 
-To add GPU results, run the Colab/Kaggle steps above. The CSV and plots will then include
-the naive and tiled kernels, transfer times, speedups and GFLOPS for that GPU.
+To add GPU results, run `notebooks/gpu_benchmark_colab.ipynb` on Colab (see above). The CSV
+and plots will then include the naive and tiled kernels, transfer times, speedups and GFLOPS
+for that GPU.
 <!-- RESULTS:END -->
 
 ## Technical summary
