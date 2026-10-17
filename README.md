@@ -190,6 +190,30 @@ thread), host compiler gcc 13.3.0, Release. Inputs uniform in [-1, 1) from `std:
 Source: `results/benchmark_results.csv`, `results/run_metadata.json`, `plots/summary.md`.
 Derived metrics (GFLOPS, speedup) were recomputed from the raw timings and match the CSV.
 
+### Benchmark Plots
+
+All plots are generated from `results/benchmark_results.csv` by `scripts/plot_results.py`.
+
+![Line chart of median execution time versus matrix size for the CPU baseline and CUDA kernels on a log scale](plots/cpu_vs_gpu_time.png)
+
+*CPU vs GPU execution time (log scale): the single-threaded CPU baseline against the naive and tiled CUDA kernels, with the tiled end-to-end line (kernel plus host↔device copies) shown for reference.*
+
+![Line chart of achieved GFLOPS versus matrix size for the CPU and CUDA kernels on a log scale](plots/gflops.png)
+
+*Achieved throughput (2N³ / time, log scale) for the CPU baseline and the naive and tiled kernels across matrix sizes.*
+
+![Line chart comparing naive and tiled CUDA kernel-only time versus matrix size on a log scale](plots/naive_vs_tiled_kernel.png)
+
+*Naive vs tiled CUDA kernel time (kernel-only, log scale): the gap between the two lines is the effect of shared-memory tiling.*
+
+![Line chart of speedup over the CPU baseline versus matrix size, kernel-only and end-to-end, on a log scale](plots/speedup.png)
+
+*Speedup over the CPU baseline (log scale), shown both kernel-only (solid) and end-to-end (dashed) for the naive and tiled kernels.*
+
+![Stacked bar charts showing the host-to-device, kernel, and device-to-host time shares for the naive and tiled kernels at each matrix size](plots/transfer_overhead.png)
+
+*Transfer overhead vs computation: for each kernel, the share of end-to-end time spent on the host→device copy, the kernel, and the device→host copy at each matrix size (bar labels give the total median time). Copies take a large share at small N and the kernel dominates as N grows.*
+
 **Observations.**
 - **Tiled beats naive at every size**, for both kernel-only and end-to-end time. The gap widens
   with N (tiled ≈ 1.1× faster at N=128, ≈ 1.6× at N=2048) as shared-memory reuse pays off.
