@@ -1,0 +1,13 @@
+build/
+build-*/
+out/
+.vs/
+.vscode/
+__pycache__/
+*.pyc
+.venv/
+*.o
+*.obj
+*.exe
+*.nsys-rep
+*.ncu-rep
