@@ -57,8 +57,10 @@ python3 scripts/plot_results.py                 # plots/ + plots/summary.md
 ### Free cloud GPU (Google Colab, NVIDIA GPU) — recommended
 
 Real GPU numbers come from `notebooks/gpu_benchmark_colab.ipynb`. It builds the CUDA
-kernels for the exact GPU Colab assigns (P100, V100, T4, A100 or L4 are all covered),
-runs the correctness tests and benchmark, and packages the results for download.
+kernels for the exact GPU Colab assigns, runs the correctness tests and benchmark, and
+packages the results for download. The build auto-detects the attached GPU's architecture,
+so any Colab GPU supported by the installed CUDA Toolkit works (with CUDA 13.x that means
+Turing or newer: T4, A100, L4, etc.; CUDA 12.x additionally covers P100/V100).
 
 **Open it in Colab**, then set the runtime to GPU: *Runtime → Change runtime type →*
 *Hardware accelerator → GPU → Save.* Either
@@ -169,36 +171,44 @@ which rows were left out and why.
 ## Results
 
 <!-- RESULTS:START -->
-### Run 20261016T122113Z: development laptop, CPU only
+### Run 20261017T195024Z: Google Colab, NVIDIA Tesla T4
 
-**Machine:** Intel Core i5-1334U (13th gen), 16 GB RAM, WSL2 Ubuntu 26.04, gcc 15.2.0, CMake
-4.2.3, Release (`-O3`). **No NVIDIA GPU** (Intel Iris Xe only), so the build has no CUDA and
-every CUDA row in the CSV is `not_run`. **No GPU numbers have been measured yet.** The plots
-that need GPU data say so on the figure.
+**Hardware/software (from `results/run_metadata.json`):** NVIDIA Tesla T4 (sm_75, 15 GB),
+driver 580.82.07, CUDA 13.0.88. CPU baseline on the Colab host (Intel Xeon @ 2.00 GHz, single
+thread), host compiler gcc 13.3.0, Release. Inputs uniform in [-1, 1) from `std::mt19937`
+(seed 42, offset per size). GPU numbers are kernel-only medians over 10 timed iterations
+(3 untimed warm-ups); CPU is the median of 3 runs (1 run for N ≥ 1024).
 
-| N | CPU median (ms) | Timed runs | GFLOPS | max abs error vs fp64 | Validation |
-|---:|---:|---:|---:|---:|---|
-| 128 | 0.948 | 3 | 4.42 | 6.2e-06 | pass (all 16,384 elements) |
-| 256 | 7.96 | 3 | 4.22 | 1.3e-05 | pass (all 65,536 elements) |
-| 512 | 102.7 | 3 | 2.61 | 3.2e-05 | pass (all 262,144 elements) |
-| 1024 | 2,511 | 1 | 0.86 | 5.9e-05 | pass (262,144 sampled elements) |
-| 2048 | 52,923 | 1 | 0.32 | 1.1e-04 | pass (262,144 sampled elements) |
+| N | CPU (ms) | Naive kernel (ms) | Tiled kernel (ms) | Naive GFLOPS | Tiled GFLOPS | Tiled speedup (kernel / E2E) | Validation |
+|---:|---:|---:|---:|---:|---:|---:|---|
+| 128  | 2.403   | 0.0260 | 0.0229 | 161 | 183 | 105× / 42×     | pass (full) |
+| 256  | 21.16   | 0.1038 | 0.0740 | 323 | 454 | 286× / 137×    | pass (full) |
+| 512  | 215.4   | 0.6820 | 0.4434 | 394 | 605 | 486× / 302×    | pass (full) |
+| 1024 | 3,316   | 8.972  | 4.532  | 239 | 474 | 732× / 597×    | pass (full vs CPU) |
+| 2048 | 67,327  | 40.07  | 25.22  | 429 | 681 | 2,669× / 2,302× | pass (full vs CPU) |
 
 Source: `results/benchmark_results.csv`, `results/run_metadata.json`, `plots/summary.md`.
+Derived metrics (GFLOPS, speedup) were recomputed from the raw timings and match the CSV.
 
 **Observations.**
-- Throughput falls about 14× from N=256 to N=2048. The inner loop reads B down a
-  column, touching a new cache line for every multiply-add. Once N rows of B no longer fit in
-  cache, each access goes to DRAM. Power-of-two strides make it worse by mapping a column's
-  lines onto the same cache sets.
-- The float32 error against the fp64 reference grows roughly with N, as expected for
-  sequential summation, and stays more than 10× inside the `1e-3` tolerance.
-- N ≥ 1024 has a single timed run (by design, to keep the 2048 run near one minute), so those
-  medians carry more noise than the small sizes.
+- **Tiled beats naive at every size**, for both kernel-only and end-to-end time. The gap widens
+  with N (tiled ≈ 1.1× faster at N=128, ≈ 1.6× at N=2048) as shared-memory reuse pays off.
+- Tiled peaks at ≈ 681 GFLOPS, about **8% of the T4's ~8.1 TFLOPS FP32 peak** — a typical
+  fraction for a simple shared-memory kernel without register blocking or vectorized loads.
+- Speedups are against the **unoptimized single-threaded CPU baseline**, so they overstate the
+  advantage over a tuned multithreaded BLAS. They are not a cuBLAS comparison.
+- All GPU results were validated element-wise against the **full** CPU result (atol=rtol=1e-3);
+  `max_abs_err ≤ 3.4e-05` across all sizes. Large per-element *relative* error at some sizes
+  comes only from output entries near zero and is expected for the combined-tolerance rule.
 
-To add GPU results, run `notebooks/gpu_benchmark_colab.ipynb` on Colab (see above). The CSV
-and plots will then include the naive and tiled kernels, transfer times, speedups and GFLOPS
-for that GPU.
+**Verified vs. not yet verified.**
+- *Verified from committed files:* the CPU, naive-CUDA and tiled-CUDA timings above, their
+  validation status, and the metadata, all for this T4 run.
+- *Run on Colab but not evidenced in the repo:* the three `ctest` correctness suites (base
+  size sweep plus tile sizes 8 and 32) passed on this runtime, but their console output is not
+  saved here, and the notebook is committed with cell outputs cleared. Re-run the notebook to
+  reproduce them. No GPU execution was tested on the Windows development laptop (Intel Iris Xe,
+  no NVIDIA GPU).
 <!-- RESULTS:END -->
 
 ## Technical summary

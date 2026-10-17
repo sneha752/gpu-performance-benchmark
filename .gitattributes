@@ -1,0 +1,28 @@
+# Normalize line endings. Git stores text as LF; these rules make checkout
+# deterministic regardless of each contributor's core.autocrlf setting.
+# Existing blobs are only re-encoded when a file is next modified (no mass
+# renormalization is forced here), so this introduces no line-ending churn.
+
+* text=auto
+
+# Source, build and data files: LF everywhere, including on Windows checkouts.
+*.cpp          text eol=lf
+*.cu           text eol=lf
+*.cuh          text eol=lf
+*.h            text eol=lf
+*.py           text eol=lf
+*.md           text eol=lf
+*.cmake        text eol=lf
+CMakeLists.txt text eol=lf
+.gitignore     text eol=lf
+.gitattributes text eol=lf
+*.csv          text eol=lf
+*.json         text eol=lf
+*.ipynb        text eol=lf
+
+# Windows-only scripts keep CRLF.
+*.bat          text eol=crlf
+*.ps1          text eol=crlf
+
+# Binary assets Git must never convert or diff as text.
+*.png          binary

@@ -20,14 +20,27 @@ if(ENABLE_CUDA)
     if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
       # "native" (CMake >= 3.24) targets exactly the GPU in this machine, so it is
       # always correct when a device is present at configure time. Otherwise fall
-      # back to an explicit list covering the GPUs the free cloud runtimes hand out:
-      # P100 (60), V100 (70), T4 (75), A100 (80), RTX 30 (86), L4/RTX 40 (89).
-      # Architecture 89 needs CUDA >= 11.8; Colab and Kaggle both ship CUDA 12.x.
+      # back to an explicit list of the GPUs the free cloud runtimes hand out.
+      # The valid list depends on the toolkit: CUDA 13.0 removed every pre-Turing
+      # architecture (Maxwell/Pascal/Volta, sm_50..sm_70), so a list containing
+      # 60/70 makes nvcc fail there. Query the compiler version and choose.
       find_program(NVIDIA_SMI nvidia-smi)
       if(NVIDIA_SMI AND CMAKE_VERSION VERSION_GREATER_EQUAL 3.24)
         set(CMAKE_CUDA_ARCHITECTURES native)
       else()
-        set(CMAKE_CUDA_ARCHITECTURES 60 70 75 80 86 89)
+        execute_process(COMMAND ${CMAKE_CUDA_COMPILER} --version
+                        OUTPUT_VARIABLE _nvcc_version ERROR_QUIET)
+        string(REGEX MATCH "release ([0-9]+)" _ "${_nvcc_version}")
+        set(_cuda_major "${CMAKE_MATCH_1}")
+        if(_cuda_major AND _cuda_major GREATER_EQUAL 13)
+          # CUDA 13+: Turing (75) .. Hopper (90). T4 (75), A100 (80), RTX 30 (86),
+          # L4/RTX 40 (89), H100 (90). Pre-Turing is unsupported by the toolkit.
+          set(CMAKE_CUDA_ARCHITECTURES 75 80 86 89 90)
+        else()
+          # CUDA 11.8 .. 12.x: P100 (60), V100 (70), T4 (75), A100 (80),
+          # RTX 30 (86), L4/RTX 40 (89). 89 needs CUDA >= 11.8.
+          set(CMAKE_CUDA_ARCHITECTURES 60 70 75 80 86 89)
+        endif()
       endif()
     endif()
     enable_language(CUDA)
